@@ -1,0 +1,6 @@
+{
+  "name": "EduCreator Studio",
+  "description": "Professional lag-free teaching studio with smooth ink whiteboard, slide & PDF presentation, clean audio recording, and PPT converter.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
