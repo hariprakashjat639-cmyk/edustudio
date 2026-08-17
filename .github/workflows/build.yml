@@ -1,4 +1,4 @@
-name: Build APK Master
+name: Build APK Master Fix
 on: [push, workflow_dispatch]
 
 jobs:
@@ -22,19 +22,44 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Auto-Fix & Build APK
+      - name: Fix Project Structure and Build
         run: |
           set -e
-          echo "=== 1. Searching for Project Root ==="
-          PROJ_DIR=$(find . -name "settings.gradle.kts" -o -name "settings.gradle" | head -n 1 | xargs dirname)
-          if [ -z "$PROJ_DIR" ]; then PROJ_DIR="."; fi
-          echo "Found Project in: $PROJ_DIR"
-          cd "$PROJ_DIR"
+          echo "=== 1. Checking Repository Content ==="
+          ls -la
 
-          echo "=== 2. Ensuring Version Catalog Exists ==="
+          # Agar app folder kisi sub-directory ke andar hai to use root me layein
+          if [ ! -d "app" ]; then
+            SUB_APP=$(find . -maxdepth 3 -type d -name "app" | head -n 1)
+            if [ -n "$SUB_APP" ]; then
+              echo "Moving $SUB_APP to ./app"
+              cp -r "$SUB_APP" ./app
+            fi
+          fi
+
+          echo "=== 2. Setting up settings.gradle.kts ==="
+          cat << 'EOF' > settings.gradle.kts
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "EduCreator Studio"
+          include(":app")
+          EOF
+
+          echo "=== 3. Ensuring Version Catalog Exists ==="
           mkdir -p gradle
-          if [ ! -f gradle/libs.versions.toml ]; then
-            cat << 'EOF' > gradle/libs.versions.toml
+          cat << 'EOF' > gradle/libs.versions.toml
           [versions]
           agp = "8.7.2"
           kotlin = "2.0.21"
@@ -55,15 +80,12 @@ jobs:
           secrets = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "secrets" }
           google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
           EOF
-          fi
 
-          echo "=== 3. Running Build with Fallback ==="
-          # Pehle standard assembleDebug try karein, agar na mile to general assemble chalayein
-          gradle assembleDebug --no-daemon || gradle assemble --no-daemon
+          echo "=== 4. Building APK ==="
+          gradle :app:assembleDebug --stacktrace --no-daemon
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: EduStudio-APK
-          path: "**/*.apk"
-          if-no-files-found: error
+          name: EduStudio-Final-APK
+          path: "**/build/outputs/apk/debug/*.apk"
